@@ -1,0 +1,22 @@
+.idea/
+.git
+
+# dependencies
+/node_modules
+/yarn.lock
+/.pnp
+.pnp.js
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# hardhat + forge build files in contracts
+cache
+artifacts
+out
