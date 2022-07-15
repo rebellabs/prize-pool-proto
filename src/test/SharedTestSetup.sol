@@ -3,18 +3,19 @@ pragma solidity ^0.8.2;
 
 import "forge-std/Test.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "../contracts/SampleNFT.sol";
+import "../contracts/PrizePoolProto.sol";
 
 contract SharedTestSetup is Test {
 
-    SampleNFT sampleNFT = new SampleNFT();
+    PrizePoolProto prizePool = new PrizePoolProto();
 
-    uint256 internal TOTAL_SUPPLY = sampleNFT.TOTAL_SUPPLY();
-    uint256 internal MINT_PRICE = sampleNFT.MINT_PRICE();
+    // uint256 internal TOTAL_SUPPLY = sampleNFT.TOTAL_SUPPLY();
+    // uint256 internal MINT_PRICE = sampleNFT.MINT_PRICE();
 
+    // Leaving that here for future reference with ECDSA signatures etc
     // Hardcoded metadata URI string and bytes signature - to emulate signing in ethers.js
-    string internal metadataURI = "b847d995e7b0c31be86fdb5169ae5faedf35c234e9df079a7222064a6a4a";
-    bytes internal signature = hex"5c693cc854ed60102753102d3045b88816dc76e98d5f5cdccef86b6a2edfd0f15e84dad6a6dc277321eb6569f704f2d4641160ef6e43086a930ccd1b12b18c061c";
+    // string internal metadataURI = "b847d995e7b0c31be86fdb5169ae5faedf35c234e9df079a7222064a6a4a";
+    // bytes internal signature = hex"5c693cc854ed60102753102d3045b88816dc76e98d5f5cdccef86b6a2edfd0f15e84dad6a6dc277321eb6569f704f2d4641160ef6e43086a930ccd1b12b18c061c";
 
     // Global verbosity of tests - switch on and off
     bool internal verbosity = true;
@@ -25,10 +26,10 @@ contract SharedTestSetup is Test {
     /**
      * @notice Asserts that the provided address has minted an NFT and has a balance 1 or greater
      */
-    function assertMint(address user) public {
-        uint addressBalance = sampleNFT.balanceOf(user);
-        assertGt(addressBalance, 0);
-    }
+    // function assertMint(address user) public {
+    //     uint addressBalance = sampleNFT.balanceOf(user);
+    //     assertGt(addressBalance, 0);
+    // }
 
     /**
      * @notice Output provided test description to CLI

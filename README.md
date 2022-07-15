@@ -22,7 +22,7 @@ yarn hardhat compile
 yarn hardhat test
 ```
 
-In order to run a local mock node and deploy your contract you can use the following: 
+In order to run a ganache local node and deploy your contract you can use the following: 
 
 ```shell
 yarn hardhat node 
@@ -54,8 +54,3 @@ To run gas report use `--gas-report`
 │   └── 📂 test/ - foundry Solidity tests
 ├── 📂 test/ - hardhat JS/TS tests
 ```
-
-## Feedback & Issues
-
-Feel free to flag it up in issues if something isn't working right or something isn't clear for you. Please use at your own risk and make sure to suggest any upgrades/fixes, this template will always remain WIP as long as both hardhat and foundry keep developing.  
-
