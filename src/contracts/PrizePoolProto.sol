@@ -4,7 +4,7 @@ pragma solidity ^0.8.2;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-contract SampleNFT is Ownable {
+contract PrizePoolProto is Ownable {
     using ECDSA for bytes32;
 
     address public trustedSigner;
@@ -12,8 +12,50 @@ contract SampleNFT is Ownable {
     // This mapping will keep the scores of users
     mapping(address => uint) private _scores;
 
-    constructor() ERC721("Prize Pool Prototype", "PPP") {
+    // This will keep the timestamp of the season start + duration
+    uint private _seasonStartDate;
+    uint private _seasonDuration = 30 days;
+
+    constructor() Ownable() {
         // Nothing here for now, should prolly set the signer at the start though
+    }
+
+    /**
+     * @notice Saves the timestamp of season start 
+     */
+    function _startSeason() public onlyOwner {
+        _seasonStartDate = block.timestamp;
+    }
+
+    /**
+     * @notice Increment user score by a provided amount
+     */
+    function addScore(address user, uint amount, bytes memory signature) public {
+        string memory data = "Construct string to sign somehow from amount and user";
+        require(_verify(data, signature));
+        if (_scores[user] == 0) {
+            _scores[user] = amount;
+        } else {
+            _scores[user] += amount;
+        }
+    }
+
+    /**
+     * @notice Allows anyone to claim reward if they have any available
+     */
+    function claimRewards() public {
+        require(_seasonDuration > 0, "Need to set the season duration first!");
+        require(block.timestamp >= _seasonStartDate + _seasonDuration, "Season isn't over yet!");
+        require(msg.sender.balance > 0, "User must have some score to claim reward!");
+        // Pay out expected reward to the user 
+        // Make payable
+    }
+
+    /**
+     * @notice Returns rewards amount for a user
+     */
+    function getUserReward(address user) public view returns (uint) {
+        return _scores[user];
     }
 
     /**
@@ -25,45 +67,25 @@ contract SampleNFT is Ownable {
     }
 
     /**
-     * @notice Increment user score by a provided amount
+     * @notice Setter for season duration
      */
-    function addScore(address user, uint amount, bytes signature) public {
-        string data = "Construct string to sign somehow from amount and user";
-        require(_verify(data, signature));
-        if (_scores[user] == 0) {
-            _scores[user] = amount;
-        } else {
-            _scores[user] += amount;
-        }
-    }
-
-    /**
-     * @dev WIP - draft
-     */
-    function claimRewards() public {
-        require(msg.sender.balance > 0, "User must have some score to claim reward!");
-    }
-
-    /**
-     * @dev WIP - draft
-     */
-    function getUserReward(address user) public {
-        return _scores[user];
+    function _setDuration(uint amount) public onlyOwner {
+        _seasonDuration = amount;
     }
 
     /**
      * @notice Verifies that the provided signature was produced by the correct signer from the given message
-     * @param metadata string containing the ceramic stream ID
-     * @param signature backend-produced signature to verify the correctness of metadata
+     * @param data data to be signed
+     * @param signature backend-produced signature to verify the trustworthyness of data
      */
     function _verify(
         string memory data,
         bytes memory signature
     ) private view returns (bool) {
-        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked(metadata)).toEthSignedMessageHash();
+        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked(data)).toEthSignedMessageHash();
         (address recoveredSigner, ECDSA.RecoverError recoverError) = ethSignedMessageHash.tryRecover(signature);
         require(recoverError == ECDSA.RecoverError.NoError);
-        require(recoveredSigner == metadataSigner, "Data signed by unstrusted signer");
+        require(recoveredSigner == trustedSigner, "Data signed by unstrusted signer");
         return true;
     }
 }
