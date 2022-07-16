@@ -10,25 +10,30 @@ contract PrizePoolProto is Ownable {
     using ECDSA for bytes32;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
 
-    address public trustedSigner;
-
-    mapping(address => uint256) private _nonces;
-    // This mapping will keep the scores of users
-    EnumerableMap.AddressToUintMap private _scores;
 
     enum SeasonStatus {
         Active,
         Claim,
         Inactive
     }
-    SeasonStatus private _seasonStatus;
 
+    SeasonStatus private _seasonStatus;
+    address private trustedSigner;
+    uint256 private totalUsersScore;
+    uint256 private prizePool = 1 ether;
+    uint256 private claimPeriod = 3 days;
     // This will keep the timestamp of the season start + duration
     uint private _seasonStartDate;
     uint private _seasonDuration = 30 days;
 
-    constructor() Ownable() {
-        // Nothing here for now, should prolly set the signer at the start though
+    mapping(address => uint256) private _nonces;
+    // This mapping will keep the scores of users
+    EnumerableMap.AddressToUintMap private _scores;
+
+    event SeasonStatusChanged(SeasonStatus status, uint256 ts);
+
+    constructor(address _trustedSigner) Ownable() {
+        trustedSigner = _trustedSigner;
     }
 
     function startSeason() external onlyOwner {
@@ -38,20 +43,14 @@ contract PrizePoolProto is Ownable {
 
     function stopSeason() external onlyOwner {
         _seasonStatus = SeasonStatus.Inactive;
-    }
 
-    function resetSeason() external onlyOwner {
-        for (uint i = 0; i < _scores.length(); i++) {
-            (address user, uint256 score) = _scores.at(i);
+        resetSeason();
 
-            if (score != 0) {
-                _scores.set(user, 0);
-            }
-        }
+        emit SeasonStatusChanged(_seasonStatus, block.timestamp);
     }
 
     function seasonIsActive() public view returns (bool) {
-        return _seasonStatus == SeasonStatus.Active;
+        return _seasonStatus == SeasonStatus.Active && _seasonDuration > 0 && block.timestamp < (_seasonStartDate + _seasonDuration);
     }
 
     function getSeasonStartDate() public view returns (uint256) {
@@ -68,6 +67,8 @@ contract PrizePoolProto is Ownable {
         require(!executed[signature], "addScore: Provided signature has already been used");
         executed[signature] = true;
 
+        totalUsersScore += amount;
+
         if (_scores.contains(user)) {
             _scores.set(user, _scores.get(user) + amount);
         } else {
@@ -81,7 +82,11 @@ contract PrizePoolProto is Ownable {
     function claimRewards() public payable {
         require(seasonIsActive(), "claimRewards: Season is not active at the moment");
         require(_scores.contains(msg.sender), "claimRewards: Non-existing user");
-        require(_scores.get(msg.sender) > 0, "claimRewards: User must have some score to claim reward!");
+
+        uint256 score = _scores.get(msg.sender);
+        require(score > 0, "claimRewards: User must have some score to claim reward!");
+
+        // uint256 userShareReward = score / totalUsersScore;
     }
 
     /**
@@ -122,5 +127,17 @@ contract PrizePoolProto is Ownable {
         require(recoverError == ECDSA.RecoverError.NoError);
         require(recoveredSigner == trustedSigner, "Data signed by unstrusted signer");
         return true;
+    }
+
+    function resetSeason() internal {
+        for (uint i = 0; i < _scores.length(); i++) {
+            (address user, uint256 score) = _scores.at(i);
+
+            if (score != 0) {
+                _scores.set(user, 0);
+            }
+        }
+
+        totalUsersScore = 0;
     }
 }
