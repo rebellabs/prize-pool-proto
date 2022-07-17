@@ -10,7 +10,6 @@ contract PrizePoolProto is Ownable {
     using ECDSA for bytes32;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
 
-
     enum SeasonStatus {
         Active,
         Claim,
@@ -22,12 +21,11 @@ contract PrizePoolProto is Ownable {
     uint256 private totalUsersScore;
     uint256 private prizePool = 1 ether;
     uint256 private claimPeriod = 3 days;
-    // This will keep the timestamp of the season start + duration
     uint private _seasonStartDate;
     uint private _seasonDuration = 30 days;
 
     mapping(address => uint256) private _nonces;
-    // This mapping will keep the scores of users
+    mapping(bytes => bool) private _executed;
     EnumerableMap.AddressToUintMap private _scores;
 
     event SeasonStatusChanged(SeasonStatus status, uint256 ts);
@@ -61,11 +59,11 @@ contract PrizePoolProto is Ownable {
      * @notice Increment user score by a provided amount
      */
     function addScore(address user, uint256 amount, bytes memory signature) public onlyOwner {
-        require(seasonIsActive(), "addScore: Season is not active at the moment");
-        require(_verify(user, amount, _nonces[user]++, signature), "addScore: Sig verification failed");
+        require(seasonIsActive(), "addScore: Season is not active at the moment!");
+        require(_verify(user, amount, _nonces[user]++, signature), "addScore: Sig verification failed!");
 
-        require(!executed[signature], "addScore: Provided signature has already been used");
-        executed[signature] = true;
+        require(!_executed[signature], "addScore: Provided signature has already been used!");
+        _executed[signature] = true;
 
         totalUsersScore += amount;
 
@@ -80,8 +78,8 @@ contract PrizePoolProto is Ownable {
      * @notice Allows anyone to claim reward if they have any available
      */
     function claimRewards() public payable {
-        require(seasonIsActive(), "claimRewards: Season is not active at the moment");
-        require(_scores.contains(msg.sender), "claimRewards: Non-existing user");
+        require(seasonIsActive(), "claimRewards: Season is not active at the moment!");
+        require(_scores.contains(msg.sender), "claimRewards: Non-existing user!");
 
         uint256 score = _scores.get(msg.sender);
         require(score > 0, "claimRewards: User must have some score to claim reward!");
@@ -113,19 +111,18 @@ contract PrizePoolProto is Ownable {
 
     /**
      * @notice Verifies that the provided signature was produced by the correct signer from the given message
-     * @param data data to be signed
-     * @param signature backend-produced signature to verify the trustworthyness of data
      */
     function _verify(
         address user,
-        uint256 memory amount,
-        uint256 memory nonce,
+        uint256 amount,
+        uint256 nonce,
         bytes memory signature
     ) private view returns (bool) {
         bytes32 ethSignedMessageHash = keccak256(abi.encodePacked(user, amount, nonce)).toEthSignedMessageHash();
+        // TODO: Decide on how we construct data string that is being signed on the backend
         (address recoveredSigner, ECDSA.RecoverError recoverError) = ethSignedMessageHash.tryRecover(signature);
-        require(recoverError == ECDSA.RecoverError.NoError);
-        require(recoveredSigner == trustedSigner, "Data signed by unstrusted signer");
+        require(recoverError == ECDSA.RecoverError.NoError, "_verify: ECDSA signature couldn't be verified!");
+        require(recoveredSigner == trustedSigner, "_verify: Data signed by unstrusted signer!");
         return true;
     }
 

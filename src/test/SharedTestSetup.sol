@@ -7,7 +7,7 @@ import "../contracts/PrizePoolProto.sol";
 
 contract SharedTestSetup is Test {
 
-    PrizePoolProto prizePool = new PrizePoolProto();
+    PrizePoolProto prizePool = new PrizePoolProto(address(228));
 
     // uint256 internal TOTAL_SUPPLY = sampleNFT.TOTAL_SUPPLY();
     // uint256 internal MINT_PRICE = sampleNFT.MINT_PRICE();
