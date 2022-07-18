@@ -1,61 +1,96 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 contract PrizePoolProto is Ownable {
     using ECDSA for bytes32;
+    using EnumerableMap for EnumerableMap.AddressToUintMap;
 
-    address public trustedSigner;
+    enum SeasonStatus {
+        Active,
+        Claim,
+        Inactive
+    }
 
-    // This mapping will keep the scores of users
-    mapping(address => uint) private _scores;
-
-    // This will keep the timestamp of the season start + duration
+    SeasonStatus private _seasonStatus;
+    address private trustedSigner;
+    uint256 private totalUsersScore;
+    uint256 private prizePool = 1 ether;
+    uint256 private claimPeriod = 3 days;
     uint private _seasonStartDate;
     uint private _seasonDuration = 30 days;
 
-    constructor() Ownable() {
-        // Nothing here for now, should prolly set the signer at the start though
+    mapping(address => uint256) private _nonces;
+    mapping(bytes => bool) private _executed;
+    EnumerableMap.AddressToUintMap private _scores;
+
+    event SeasonStatusChanged(SeasonStatus status, uint256 ts);
+
+    constructor(address _trustedSigner) Ownable() {
+        trustedSigner = _trustedSigner;
     }
 
-    /**
-     * @notice Saves the timestamp of season start 
-     */
-    function _startSeason() public onlyOwner {
+    function startSeason() external onlyOwner {
         _seasonStartDate = block.timestamp;
+        _seasonStatus = SeasonStatus.Active;
+        emit SeasonStatusChanged(_seasonStatus, block.timestamp);
+    }
+
+    function stopSeason() external onlyOwner {
+        _seasonStatus = SeasonStatus.Inactive;
+        resetSeason();
+        emit SeasonStatusChanged(_seasonStatus, block.timestamp);
+    }
+
+    function seasonIsActive() public view returns (bool) {
+        return _seasonStatus == SeasonStatus.Active && _seasonDuration > 0 && block.timestamp < (_seasonStartDate + _seasonDuration);
+    }
+
+    function getSeasonStartDate() public view returns (uint256) {
+        return _seasonStartDate;
     }
 
     /**
      * @notice Increment user score by a provided amount
      */
-    function addScore(address user, uint amount, bytes memory signature) public {
-        string memory data = "Construct string to sign somehow from amount and user";
-        require(_verify(data, signature));
-        if (_scores[user] == 0) {
-            _scores[user] = amount;
+    function addScore(address user, uint256 amount, bytes memory signature) public onlyOwner {
+        require(seasonIsActive(), "addScore: Season is not active at the moment!");
+        require(_verify(user, amount, _nonces[user]++, signature), "addScore: Sig verification failed!");
+
+        require(!_executed[signature], "addScore: Provided signature has already been used!");
+        _executed[signature] = true;
+
+        totalUsersScore += amount;
+
+        if (_scores.contains(user)) {
+            _scores.set(user, _scores.get(user) + amount);
         } else {
-            _scores[user] += amount;
+            _scores.set(user, amount);
         }
     }
 
     /**
      * @notice Allows anyone to claim reward if they have any available
      */
-    function claimRewards() public {
-        require(_seasonDuration > 0, "Need to set the season duration first!");
-        require(block.timestamp >= _seasonStartDate + _seasonDuration, "Season isn't over yet!");
-        require(msg.sender.balance > 0, "User must have some score to claim reward!");
-        // Pay out expected reward to the user 
-        // Make payable
+    function claimRewards() public payable {
+        require(seasonIsActive(), "claimRewards: Season is not active at the moment!");
+        require(_scores.contains(msg.sender), "claimRewards: Non-existing user!");
+
+        uint256 score = _scores.get(msg.sender);
+        require(score > 0, "claimRewards: User must have some score to claim reward!");
+
+        // uint256 userShareReward = score / totalUsersScore;
     }
 
     /**
      * @notice Returns rewards amount for a user
      */
     function getUserReward(address user) public view returns (uint) {
-        return _scores[user];
+        return _scores.get(user);
     }
 
     /**
@@ -75,17 +110,30 @@ contract PrizePoolProto is Ownable {
 
     /**
      * @notice Verifies that the provided signature was produced by the correct signer from the given message
-     * @param data data to be signed
-     * @param signature backend-produced signature to verify the trustworthyness of data
      */
     function _verify(
-        string memory data,
+        address user,
+        uint256 amount,
+        uint256 nonce,
         bytes memory signature
     ) private view returns (bool) {
-        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked(data)).toEthSignedMessageHash();
+        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked(user, amount, nonce)).toEthSignedMessageHash();
+        // TODO: Decide on how we construct data string that is being signed on the backend
         (address recoveredSigner, ECDSA.RecoverError recoverError) = ethSignedMessageHash.tryRecover(signature);
-        require(recoverError == ECDSA.RecoverError.NoError);
-        require(recoveredSigner == trustedSigner, "Data signed by unstrusted signer");
+        require(recoverError == ECDSA.RecoverError.NoError, "_verify: ECDSA signature couldn't be verified!");
+        require(recoveredSigner == trustedSigner, "_verify: Data signed by unstrusted signer!");
         return true;
+    }
+
+    function resetSeason() internal {
+        for (uint i = 0; i < _scores.length(); i++) {
+            (address user, uint256 score) = _scores.at(i);
+
+            if (score != 0) {
+                _scores.set(user, 0);
+            }
+        }
+
+        totalUsersScore = 0;
     }
 }

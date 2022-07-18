@@ -4,7 +4,7 @@ pragma solidity ^0.8.2;
 import "./SharedTestSetup.sol";
 
 contract SampleTest is SharedTestSetup {
-    function testCanMintAnNFT() public {
+    function testCan() public {
         // emitTestDescription("Users can mint and receive an NFT for declared price.", verbosity);
 
         // // Get random address
