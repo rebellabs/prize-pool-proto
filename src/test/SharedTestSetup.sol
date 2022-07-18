@@ -6,8 +6,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "../contracts/PrizePoolProto.sol";
 
 contract SharedTestSetup is Test {
-
-    PrizePoolProto prizePool = new PrizePoolProto(address(228));
+    PrizePoolProto prizePool = new PrizePoolProto(address(777));
 
     // uint256 internal TOTAL_SUPPLY = sampleNFT.TOTAL_SUPPLY();
     // uint256 internal MINT_PRICE = sampleNFT.MINT_PRICE();
@@ -23,13 +22,9 @@ contract SharedTestSetup is Test {
     // Use this nonce accross different test contracts to securely generate pseudorandom addresses
     uint internal sharedNonce = 0;
 
-    /**
-     * @notice Asserts that the provided address has minted an NFT and has a balance 1 or greater
-     */
-    // function assertMint(address user) public {
-    //     uint addressBalance = sampleNFT.balanceOf(user);
-    //     assertGt(addressBalance, 0);
-    // }
+    // Private key of metadata signer - currently hardhat #19 account
+    uint256 internal signerPrivateKey = 0xdf57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e;
+
 
     /**
      * @notice Output provided test description to CLI
@@ -56,5 +51,24 @@ contract SharedTestSetup is Test {
             sharedNonce++;
 
             return randomAddress;
+    }
+
+    /**
+     * @notice Generate and return pseudorandom hex string
+     */
+    function getRandomString() internal returns (string memory) {
+            string memory randString = Strings.toHexString(uint256(keccak256(abi.encodePacked(sharedNonce, blockhash(block.number)))), 32);
+            sharedNonce++;
+            return randString;
+    }
+
+    /**
+     * @notice Generate ethers-style signature for a provided string
+     */
+    function getStringSignature(string memory metadata) internal returns (bytes memory) {
+        bytes32 hash = keccak256(abi.encodePacked(metadata));
+        bytes32 signedHash = hash.toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, signedHash);
+        return bytes.concat(r, s, abi.encodePacked(v));
     }
 }

@@ -37,13 +37,12 @@ contract PrizePoolProto is Ownable {
     function startSeason() external onlyOwner {
         _seasonStartDate = block.timestamp;
         _seasonStatus = SeasonStatus.Active;
+        emit SeasonStatusChanged(_seasonStatus, block.timestamp);
     }
 
     function stopSeason() external onlyOwner {
         _seasonStatus = SeasonStatus.Inactive;
-
         resetSeason();
-
         emit SeasonStatusChanged(_seasonStatus, block.timestamp);
     }
 
