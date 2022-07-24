@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.8;
+pragma solidity 0.8.9;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -15,52 +15,61 @@ contract PrizePoolProto is Ownable {
         Inactive,
         Scheduled
     }
-
-    enum SeasonDuration {// or let admin choose arbitrary season duration
-        Day,
-        Week,
-        Month
-    }
     SeasonStatus private _seasonStatus;
 
     address private trustedSigner;
 
-    uint256 private totalUsersScore;
-    uint256 private prizePool = 1 ether;
-    uint256 private claimPeriod = 3 days;
-    uint private _seasonStartDate;
-    uint private _seasonFinishDate;
-    uint private _seasonDuration = 30 days;
+    uint256 private _totalUsersScore;
+    uint256 private _prizePool = 1 ether;
+    uint256 private _claimPeriod = 3 days;
+    uint256 private _seasonStartDate;
+    uint256 private _seasonFinishDate;
+    uint256 private _seasonDuration = 30 days;
 
     mapping(address => uint256) private _nonces;
     mapping(bytes => bool) private _executed;
     EnumerableMap.AddressToUintMap private _scores;
 
+    event SeasonScheduled(uint256 startDate, uint256 duration, uint256 _prizePool);
     event SeasonStatusChanged(SeasonStatus status, uint256 ts);
     event UserRewardClaimed(address user, uint256 amount);
+
+    modifier onlySeasonStatus(SeasonStatus status) {
+        require(_seasonStatus == status);
+        _;
+    }
 
     constructor(address _trustedSigner) Ownable() {
         trustedSigner = _trustedSigner;
     }
 
-    function scheduleSeason(uint256 timestamp, /*SeasonDuration*/uint256 dur) external onlyOwner {
-        _seasonStartDate = timestamp;
-        _seasonFinishDate = timestamp + dur;
+    function scheduleSeason(uint256 startDate, uint256 seasonDuration, uint256 prizePool) external
+    onlyOwner
+    {
+        _seasonStartDate = _seasonStartDate;
+        _seasonFinishDate = _seasonStartDate + _seasonDuration;
+        _prizePool = prizePool;
         _seasonStatus = SeasonStatus.Scheduled;
-        _seasonDuration = dur;
+        _seasonDuration = _seasonDuration;
 
-        emitSeasonStatusChanged(_seasonStatus);
+        emit SeasonScheduled(startDate, seasonDuration, prizePool);
     }
 
-    function startSeason() external onlyOwner {
-        if (!seasonIsActive()) {
-            revert("startSeason: Season is already active");
-        }
+    /**
+     * @notice Activate season from scheduled state (Claim -> Active)
+     */
+    function startSeason() external
+    onlyOwner
+    onlySeasonStatus(SeasonStatus.Scheduled)
+    {
         _seasonStatus = SeasonStatus.Active;
 
         emitSeasonStatusChanged(_seasonStatus);
     }
 
+    /**
+     * @notice Stop season if it's needed
+     */
     function stopSeason() external onlyOwner {
         _seasonStatus = SeasonStatus.Inactive;
         resetSeason();
@@ -68,29 +77,40 @@ contract PrizePoolProto is Ownable {
         emitSeasonStatusChanged(_seasonStatus);
     }
 
+    /**
+     * @notice Stop season if it's needed
+     */
     function startClaimPeriod() external onlyOwner {
         _seasonStatus = SeasonStatus.Claim;
+
+        emitSeasonStatusChanged(_seasonStatus);
     }
 
-    function seasonIsActive() public view returns (bool) {
-        return _seasonStatus == SeasonStatus.Active && _seasonDuration > 0 && block.timestamp < (_seasonStartDate + _seasonDuration);
-    }
-
-    function getSeasonStartDate() public view returns (uint256) {
+    function getSeasonStartDate() external view returns (uint256) {
         return _seasonStartDate;
+    }
+
+    function getSeasonFinishDate() external view returns (uint256) {
+        return _seasonFinishDate;
+    }
+
+    function getUserNonce(address user) external view returns (uint256) {
+        return _nonces[user];
     }
 
     /**
      * @notice Increment user score by a provided amount
      */
-    function addScore(address user, uint256 amount, uint256 nonce, bytes memory signature) public onlyOwner {
-        require(seasonIsActive(), "addScore: Season is not active at the moment!");
+    function addScore(address user, uint256 amount, uint256 nonce, bytes memory signature) external
+    onlyOwner
+    onlySeasonStatus(SeasonStatus.Active)
+    {
         require(_verify(user, amount, nonce, signature), "addScore: Sig verification failed!");
         _nonces[user]++;
         require(!_executed[signature], "addScore: Provided signature has already been used!");
         _executed[signature] = true;
 
-        totalUsersScore += amount;
+        _totalUsersScore += amount;
 
         if (_scores.contains(user)) {
             _scores.set(user, _scores.get(user) + amount);
@@ -102,8 +122,9 @@ contract PrizePoolProto is Ownable {
     /**
      * @notice Allows anyone to claim reward if they have any available
      */
-    function claimReward() external {
-        require(seasonIsActive(), "claimRewards: Season is not active at the moment!");
+    function claimReward() external
+    onlySeasonStatus(SeasonStatus.Claim)
+    {
         address addr = msg.sender;
         require(_scores.contains(addr), "claimRewards: Non-existing user!");
 
@@ -137,10 +158,6 @@ contract PrizePoolProto is Ownable {
         _seasonDuration = amount;
     }
 
-    function getUserNonce(address user) external view returns (uint256) {
-        return _nonces[user];
-    }
-
     /**
      * @notice Verifies that the provided signature was produced by the correct signer from the given message
      */
@@ -160,14 +177,11 @@ contract PrizePoolProto is Ownable {
 
     function resetSeason() internal {
         for (uint i = 0; i < _scores.length(); i++) {
-            (address user, uint256 score) = _scores.at(i);
-
-            if (score != 0) {
-                _scores.set(user, 0);
-            }
+            (address user,) = _scores.at(i);
+            _scores.remove(user);
         }
 
-        totalUsersScore = 0;
+        _totalUsersScore = 0;
     }
 
     function emitSeasonStatusChanged(SeasonStatus status) internal {
