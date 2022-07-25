@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "../contracts/PrizePoolProto.sol";
 
 contract SharedTestSetup is Test {
+    using ECDSA for bytes32;
+
     PrizePoolProto prizePool = new PrizePoolProto(address(777));
 
     // uint256 internal TOTAL_SUPPLY = sampleNFT.TOTAL_SUPPLY();
@@ -24,7 +26,6 @@ contract SharedTestSetup is Test {
 
     // Private key of metadata signer - currently hardhat #19 account
     uint256 internal signerPrivateKey = 0xdf57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e;
-
 
     /**
      * @notice Output provided test description to CLI

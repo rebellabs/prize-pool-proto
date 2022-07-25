@@ -2,6 +2,6 @@
 src = 'src'
 out = 'out'
 libs = ['lib']
-gas_reports = ["SampleNFT"]
+gas_reports = ["PrizePoolProto"]
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config
