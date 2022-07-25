@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.9;
+pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract PrizePoolProto is Ownable {
     using ECDSA for bytes32;
@@ -17,7 +18,9 @@ contract PrizePoolProto is Ownable {
     }
     SeasonStatus private _seasonStatus;
 
-    address private trustedSigner;
+    address private _trustedSigner;
+
+    address private _rewardsToken;
 
     uint256 private _totalUsersScore;
     uint256 private _prizePool = 1 ether;
@@ -39,10 +42,13 @@ contract PrizePoolProto is Ownable {
         _;
     }
 
-    constructor(address _trustedSigner) Ownable() {
-        trustedSigner = _trustedSigner;
+    constructor(address _signer) Ownable() {
+        _trustedSigner = _signer;
     }
 
+    /**
+     * @notice Schedule a season to start at a timestamp in the future
+     */
     function scheduleSeason(uint256 startDate, uint256 seasonDuration, uint256 prizePool) external
     onlyOwner
     {
@@ -125,7 +131,7 @@ contract PrizePoolProto is Ownable {
     function claimReward() external
     onlySeasonStatus(SeasonStatus.Claim)
     {
-        address addr = msg.sender;
+        address payable addr = payable(msg.sender);
         require(_scores.contains(addr), "claimRewards: Non-existing user!");
 
         uint256 score = _scores.get(addr);
@@ -133,22 +139,46 @@ contract PrizePoolProto is Ownable {
 
         _scores.set(addr, 0);
 
+        if (_rewardsToken == address(0)) {
+            uint value = _prizePool * getUserPoolPercentage(addr);
+            addr.transfer(value);
+        } else {
+            uint value = _prizePool * getUserPoolPercentage(addr);
+            IERC20(_rewardsToken).transfer(addr, value);
+        }
+
         emit UserRewardClaimed(msg.sender, score);
     }
 
     /**
-     * @notice Returns rewards amount for a user
+     * @notice Returns user's raw score
      */
-    function getUserReward(address user) public view returns (uint) {
+    function getUserScore(address user) public view returns (uint) {
         return _scores.get(user);
     }
+
+    /**
+     * @notice Get user's share/percentage of the entire prize pool
+     */
+    function getUserPoolPercentage(address user) public view returns (uint) {
+        uint userScore = getUserScore(user);
+        return (userScore / _totalUsersScore);
+    }
+
+    // /**
+    //  * @notice Returns reward for a user
+    //  */
+    // function getUserReward(address user) public view returns (uint) {
+    //     uint userScore = _scores.get(user)
+    //     return _scores.get(user) /;
+    // }
 
     /**
      * @notice Setter for trusted metadata signer
      * @param signer Public ethereum address of a trusted signer
      */
     function _setSigner(address signer) public onlyOwner {
-        trustedSigner = signer;
+        _trustedSigner = signer;
     }
 
     /**
@@ -156,6 +186,13 @@ contract PrizePoolProto is Ownable {
      */
     function _setDuration(uint amount) public onlyOwner {
         _seasonDuration = amount;
+    }
+
+    /**
+     * @notice Set rewards token address
+     */
+    function _setRewardsToken(address token) public onlyOwner {
+        _rewardsToken = token;
     }
 
     /**
@@ -171,7 +208,7 @@ contract PrizePoolProto is Ownable {
         // TODO: Decide on how we construct data string that is being signed on the backend
         (address recoveredSigner, ECDSA.RecoverError recoverError) = ethSignedMessageHash.tryRecover(signature);
         require(recoverError == ECDSA.RecoverError.NoError, "_verify: ECDSA signature couldn't be verified!");
-        require(recoveredSigner == trustedSigner, "_verify: Data signed by unstrusted signer!");
+        require(recoveredSigner == _trustedSigner, "_verify: Data signed by unstrusted signer!");
         return true;
     }
 
