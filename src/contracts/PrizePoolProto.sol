@@ -16,7 +16,8 @@ contract PrizePoolProto is Ownable {
         Inactive,
         Scheduled
     }
-    SeasonStatus private _seasonStatus;
+    
+    SeasonStatus private _seasonStatus = SeasonStatus.Inactive;
 
     address private _trustedSigner;
 
@@ -58,7 +59,7 @@ contract PrizePoolProto is Ownable {
         require(prizePool > 0, "Big prizes only!");
         require(seasonDuration > minSeasonDuration, "Season duration below minimal value!");
         require(startDate > block.timestamp, "Start time should be in the future!");
-        
+
         _seasonStartDate = startDate;
         _seasonFinishDate = startDate + seasonDuration;
         _prizePool = prizePool;
