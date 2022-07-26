@@ -23,14 +23,16 @@ contract PrizePoolProto is Ownable {
     address private _rewardsToken;
 
     uint256 private _totalUsersScore;
-    uint256 private _prizePool; // Removed default value
+    uint256 private _prizePool; // TODO: Decide on default values of all global vars
     uint256 private _claimPeriod = 3 days;
     uint256 private _seasonStartDate;
     uint256 private _seasonFinishDate;
     uint256 private _seasonDuration = 30 days;
 
-    mapping(address => uint256) private _nonces;
-    mapping(bytes => bool) private _executed;
+    uint private minSeasonDuration = 1 days;
+
+    mapping(address => uint256) private _nonces; //TODO use Enumerable map? 
+    mapping(bytes => bool) private _executed; //TODO use Enumerable map? 
     EnumerableMap.AddressToUintMap private _scores;
 
     event SeasonScheduled(uint256 startDate, uint256 duration, uint256 _prizePool);
@@ -51,14 +53,20 @@ contract PrizePoolProto is Ownable {
      */
     function scheduleSeason(uint256 startDate, uint256 seasonDuration, uint256 prizePool) external
     onlyOwner
+    onlySeasonStatus(SeasonStatus.Inactive)
     {
+        require(prizePool > 0, "Big prizes only!");
+        require(seasonDuration > minSeasonDuration, "Season duration below minimal value!");
+        require(startDate > block.timestamp, "Start time should be in the future!");
+        
         _seasonStartDate = startDate;
         _seasonFinishDate = startDate + seasonDuration;
         _prizePool = prizePool;
         _seasonStatus = SeasonStatus.Scheduled;
         _seasonDuration = seasonDuration;
 
-        emit SeasonScheduled(startDate, seasonDuration, prizePool);
+        emit SeasonScheduled(startDate, seasonDuration, prizePool); 
+        // TODO can we unify this event emition with emitSeasonStatusChanged()?
     }
 
     /**
@@ -70,23 +78,30 @@ contract PrizePoolProto is Ownable {
     {
         require(block.timestamp >= _seasonStartDate, "Cannot start season before the scheduled time!");
         _seasonStatus = SeasonStatus.Active;
+        _seasonStartDate = block.timestamp;
         emitSeasonStatusChanged(_seasonStatus);
     }
 
     /**
      * @notice Stop season if it's needed
      */
-    function stopSeason() external onlyOwner {
+    function stopSeason() external 
+    onlyOwner
+    onlySeasonStatus(SeasonStatus.Active)
+    {
+        require(_seasonStatus != SeasonStatus.Claim, "Cannot stop and reset in the claim period!");
         _seasonStatus = SeasonStatus.Inactive;
         resetSeason();
-
         emitSeasonStatusChanged(_seasonStatus);
     }
 
     /**
-     * @notice Stop season if it's needed
+     * @notice Open reward claim period for players
      */
-    function startClaimPeriod() external onlyOwner {
+    function startClaimPeriod() external 
+    onlyOwner 
+    onlySeasonStatus(SeasonStatus.Active)
+    {
         _seasonStatus = SeasonStatus.Claim;
 
         emitSeasonStatusChanged(_seasonStatus);
@@ -169,14 +184,6 @@ contract PrizePoolProto is Ownable {
         return (userScore / _totalUsersScore);
     }
 
-    // /**
-    //  * @notice Returns reward for a user
-    //  */
-    // function getUserReward(address user) public view returns (uint) {
-    //     uint userScore = _scores.get(user)
-    //     return _scores.get(user) /;
-    // }
-
     /**
      * @notice Setter for trusted metadata signer
      * @param signer Public ethereum address of a trusted signer
@@ -217,6 +224,8 @@ contract PrizePoolProto is Ownable {
     }
 
     function resetSeason() internal {
+        // TODO: What else needs resetting here? 
+
         for (uint i = 0; i < _scores.length(); i++) {
             (address user,) = _scores.at(i);
             _scores.remove(user);
