@@ -8,11 +8,6 @@ import "../contracts/PrizePoolProto.sol";
 contract SharedTestSetup is Test {
     using ECDSA for bytes32;
 
-    // Leaving that here for future reference with ECDSA signatures etc
-    // Hardcoded metadata URI string and bytes signature - to emulate signing in ethers.js
-    // string internal metadataURI = "b847d995e7b0c31be86fdb5169ae5faedf35c234e9df079a7222064a6a4a";
-    // bytes internal signature = hex"5c693cc854ed60102753102d3045b88816dc76e98d5f5cdccef86b6a2edfd0f15e84dad6a6dc277321eb6569f704f2d4641160ef6e43086a930ccd1b12b18c061c";
-
     // Global verbosity of tests - switch on and off
     bool internal verbosity = true;
 
@@ -65,7 +60,7 @@ contract SharedTestSetup is Test {
     /**
      * @dev ut into function to be reused in many tests
      */
-    function scheduleAndAssertScheduled(uint256 startDate, uint256 seasonDuration, uint256 prizePoolSize) internal {
+    function scheduleAndAssertScheduled(uint256 startDate, uint256 seasonDuration) internal {
         prizePool.scheduleSeason(startDate, seasonDuration, prizePoolSize);
         assertEq(prizePool.getSeasonStatus(), 3);
         assertEq(prizePool.getSeasonFinishDate(), startDate + seasonDuration);

@@ -6,10 +6,7 @@ import "./SharedTestSetup.sol";
 contract BasicTest is SharedTestSetup {
     function setUp() public {
         // Schedule season and assert status and variables are correct
-        prizePool.scheduleSeason(block.timestamp + 10000, 20000, prizePoolSize);
-        vm.deal(address(prizePool), prizePoolSize);
-        assertEq(prizePool.getSeasonStatus(), 3);
-        assertEq(prizePool.getSeasonFinishDate(), block.timestamp + 10000 + 20000);
+        scheduleAndAssertScheduled(block.timestamp + 10000, 20000);
         // Now increment block number and timestamp and start season
         vm.roll(2);
         vm.warp(block.timestamp + 10000 + 20000);

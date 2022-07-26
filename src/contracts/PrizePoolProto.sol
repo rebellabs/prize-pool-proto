@@ -16,7 +16,7 @@ contract PrizePoolProto is Ownable {
         Inactive,
         Scheduled
     }
-    
+
     SeasonStatus private _seasonStatus = SeasonStatus.Inactive;
 
     address private _trustedSigner;
@@ -30,7 +30,7 @@ contract PrizePoolProto is Ownable {
     uint256 private _seasonFinishDate;
     uint256 private _seasonDuration = 30 days;
 
-    uint private minSeasonDuration = 1 days;
+    uint private minSeasonDuration = 10000; //TODO: Set a sensible value
 
     mapping(address => uint256) private _nonces; //TODO use Enumerable map? 
     mapping(bytes => bool) private _executed; //TODO use Enumerable map? 
@@ -70,6 +70,7 @@ contract PrizePoolProto is Ownable {
         // TODO can we unify this event emition with emitSeasonStatusChanged()?
     }
 
+
     /**
      * @notice Activate season from scheduled state (Claim -> Active)
      */
@@ -84,13 +85,13 @@ contract PrizePoolProto is Ownable {
     }
 
     /**
-     * @notice Stop season if it's needed
+     * @notice Stop or un-schedule the season if it's necessary
      */
     function stopSeason() external 
     onlyOwner
-    onlySeasonStatus(SeasonStatus.Active)
     {
         require(_seasonStatus != SeasonStatus.Claim, "Cannot stop and reset in the claim period!");
+        require(_seasonStatus != SeasonStatus.Inactive, "Cannot stop an inactive season!");
         _seasonStatus = SeasonStatus.Inactive;
         resetSeason();
         emitSeasonStatusChanged(_seasonStatus);
