@@ -23,7 +23,7 @@ contract PrizePoolProto is Ownable {
     address private _rewardsToken;
 
     uint256 private _totalUsersScore;
-    uint256 private _prizePool = 1 ether;
+    uint256 private _prizePool; // Removed default value
     uint256 private _claimPeriod = 3 days;
     uint256 private _seasonStartDate;
     uint256 private _seasonFinishDate;
@@ -52,11 +52,11 @@ contract PrizePoolProto is Ownable {
     function scheduleSeason(uint256 startDate, uint256 seasonDuration, uint256 prizePool) external
     onlyOwner
     {
-        _seasonStartDate = _seasonStartDate;
-        _seasonFinishDate = _seasonStartDate + _seasonDuration;
+        _seasonStartDate = startDate;
+        _seasonFinishDate = startDate + seasonDuration;
         _prizePool = prizePool;
         _seasonStatus = SeasonStatus.Scheduled;
-        _seasonDuration = _seasonDuration;
+        _seasonDuration = seasonDuration;
 
         emit SeasonScheduled(startDate, seasonDuration, prizePool);
     }
@@ -68,8 +68,8 @@ contract PrizePoolProto is Ownable {
     onlyOwner
     onlySeasonStatus(SeasonStatus.Scheduled)
     {
+        require(block.timestamp >= _seasonStartDate, "Cannot start season before the scheduled time!");
         _seasonStatus = SeasonStatus.Active;
-
         emitSeasonStatusChanged(_seasonStatus);
     }
 
@@ -90,6 +90,10 @@ contract PrizePoolProto is Ownable {
         _seasonStatus = SeasonStatus.Claim;
 
         emitSeasonStatusChanged(_seasonStatus);
+    }
+
+    function getSeasonStatus() external view returns (uint) {
+        return uint(_seasonStatus);
     }
 
     function getSeasonStartDate() external view returns (uint256) {
