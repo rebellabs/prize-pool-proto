@@ -25,15 +25,19 @@ contract PrizePoolProto is Ownable {
 
     uint256 private _totalUsersScore;
     uint256 private _prizePool; // TODO: Decide on default values of all global vars
-    uint256 private _claimPeriod = 3 days;
     uint256 private _seasonStartDate;
     uint256 private _seasonFinishDate;
-    uint256 private _seasonDuration = 30 days;
 
-    uint private minSeasonDuration = 10000; //TODO: Set a sensible value
+    uint256 private _claimPeriodDuration;
+    uint256 private _seasonDuration;
 
-    mapping(address => uint256) private _nonces; //TODO use Enumerable map? 
-    mapping(bytes => bool) private _executed; //TODO use Enumerable map? 
+    uint256 private  _minSeasonDuration = 1 days;
+    uint256 private _maxSeasonDuration = 12 weeks;
+    uint256 private _minClaimPeriodDuration = 1 days;
+    uint256 private _maxClaimPeriodDuration = 5 days;
+
+    mapping(address => uint256) private _nonces; //TODO use Enumerable map?
+    mapping(bytes => bool) private _executed; //TODO use Enumerable map?
     EnumerableMap.AddressToUintMap private _scores;
 
     event SeasonScheduled(uint256 startDate, uint256 duration, uint256 _prizePool);
@@ -45,20 +49,38 @@ contract PrizePoolProto is Ownable {
         _;
     }
 
-    constructor(address _signer) Ownable() {
+    constructor(
+        address _signer,
+        uint256 minSeasonDuration,
+        uint256 maxSeasonDuration,
+        uint256 minClaimPeriodDuration,
+        uint256 maxClaimPeriodDuration
+    ) Ownable() {
         _trustedSigner = _signer;
+        _minSeasonDuration = minSeasonDuration;
+        _maxSeasonDuration = maxSeasonDuration;
+        _minClaimPeriodDuration = minClaimPeriodDuration;
+        _maxClaimPeriodDuration = maxClaimPeriodDuration;
     }
 
     /**
      * @notice Schedule a season to start at a timestamp in the future
      */
-    function scheduleSeason(uint256 startDate, uint256 seasonDuration, uint256 prizePool) external
+    function scheduleSeason(
+        uint256 startDate,
+        uint256 seasonDuration,
+        uint256 claimPeriodDuration,
+        uint256 prizePool
+    ) external
     onlyOwner
     onlySeasonStatus(SeasonStatus.Inactive)
     {
         require(prizePool > 0, "Big prizes only!");
-        require(seasonDuration > minSeasonDuration, "Season duration below minimal value!");
         require(startDate > block.timestamp, "Start time should be in the future!");
+        require(seasonDuration > _minSeasonDuration, "Season duration below minimal value!");
+        require(seasonDuration <= _maxSeasonDuration, "Season duration above maximum value!");
+        require(claimPeriodDuration > _minClaimPeriodDuration, "Season duration below minimal value!");
+        require(claimPeriodDuration <= _maxClaimPeriodDuration, "Season duration below minimal value!");
 
         _seasonStartDate = startDate;
         _seasonFinishDate = startDate + seasonDuration;
@@ -66,10 +88,9 @@ contract PrizePoolProto is Ownable {
         _seasonStatus = SeasonStatus.Scheduled;
         _seasonDuration = seasonDuration;
 
-        emit SeasonScheduled(startDate, seasonDuration, prizePool); 
+        emit SeasonScheduled(startDate, seasonDuration, prizePool);
         // TODO can we unify this event emition with emitSeasonStatusChanged()?
     }
-
 
     /**
      * @notice Activate season from scheduled state (Claim -> Active)
@@ -87,11 +108,11 @@ contract PrizePoolProto is Ownable {
     /**
      * @notice Stop or un-schedule the season if it's necessary
      */
-    function stopSeason() external 
+    function stopSeason() external
     onlyOwner
     {
-        require(_seasonStatus != SeasonStatus.Claim, "Cannot stop and reset in the claim period!");
-        require(_seasonStatus != SeasonStatus.Inactive, "Cannot stop an inactive season!");
+        //        require(_seasonStatus != SeasonStatus.Claim, "Cannot stop and reset in the claim period!");
+        //        require(_seasonStatus != SeasonStatus.Inactive, "Cannot stop an inactive season!");
         _seasonStatus = SeasonStatus.Inactive;
         resetSeason();
         emitSeasonStatusChanged(_seasonStatus);
@@ -100,8 +121,8 @@ contract PrizePoolProto is Ownable {
     /**
      * @notice Open reward claim period for players
      */
-    function startClaimPeriod() external 
-    onlyOwner 
+    function startClaimPeriod() external
+    onlyOwner
     onlySeasonStatus(SeasonStatus.Active)
     {
         _seasonStatus = SeasonStatus.Claim;
@@ -119,6 +140,10 @@ contract PrizePoolProto is Ownable {
 
     function getSeasonFinishDate() external view returns (uint256) {
         return _seasonFinishDate;
+    }
+
+    function getClaimPeriodDuration() external view returns (uint256) {
+        return _claimPeriodDuration;
     }
 
     function getUserNonce(address user) external view returns (uint256) {
@@ -226,7 +251,7 @@ contract PrizePoolProto is Ownable {
     }
 
     function resetSeason() internal {
-        // TODO: What else needs resetting here? 
+        // TODO: What else needs resetting here?
 
         for (uint i = 0; i < _scores.length(); i++) {
             (address user,) = _scores.at(i);

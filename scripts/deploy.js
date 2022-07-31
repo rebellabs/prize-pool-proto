@@ -4,7 +4,6 @@
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
 const {ethers} = require("hardhat");
-const fs = require('fs/promises');
 
 async function main() {
     // Hardhat always runs the compile task when running scripts with its command
@@ -20,7 +19,21 @@ async function main() {
     // We get the contract to deploy
     const prizePoolContract = await ethers.getContractFactory("PrizePoolProto");
 
-    const prizePool = await prizePoolContract.deploy(deployer.address);
+    const DAY = 60 * 60 * 24;
+
+    // const minSeasonDuration = DAY;
+    // const maxSeasonDuration = DAY * 4;
+    //
+    // const minClaimPeriodDuration = DAY;
+    // const maxClaimPeriodDuration = DAY * 3;
+
+    const prizePool = await prizePoolContract.deploy(
+        deployer.address,
+        300,// minSeasonDuration,
+        300,// maxSeasonDuration,
+        300,// minClaimPeriodDuration,
+        300// maxClaimPeriodDuration
+    );
 
     await prizePool.deployed();
 
